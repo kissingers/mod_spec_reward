@@ -15,14 +15,12 @@
 #include "Creature.h"
 #include "WorldSessionMgr.h"
 #include "Mail.h"
-#include "CalendarMgr.h"  // 如果将来需要记录事件时间戳可启用
 
-static bool ModuleEnable, AnnouncerEnable;
-static uint32 RewardSpec,MinimalLevel,DungeonToken,RaidToken,TokenCount;
-std::string HMessageText;
-std::string TMessageText;
-std::string DMessageText;
-std::string BannerText;
+static bool sModuleEnabled, sAnnounceEnabled;
+static uint32 sRewardSpecFlags, sMinBossLevel, sDungeonTokenId, sRaidTokenId, sTokenCount;
+std::string sHealerRewardText;
+std::string sTankRewardText;
+std::string sDpsRewardText;
 
 enum SpecType
 {
@@ -31,17 +29,16 @@ enum SpecType
     FLAG_SPEC_TANK   = 0x00000004
 };
 
-// Add player scripts
-class Spec_Reward : public PlayerScript
+class SpecReward : public PlayerScript
 {
 public:
-    Spec_Reward() : PlayerScript("Spec_Reward") { }
+    SpecReward() : PlayerScript("SpecReward") { }
 
     void OnPlayerLogin(Player* player) override
     {
-        if (ModuleEnable && AnnouncerEnable)
+        if (sModuleEnabled && sAnnounceEnabled)
         {
-            ChatHandler(player->GetSession()).SendSysMessage("服务器已启用 |cff4CFF00天赋奖励模块|r。击杀副本Boss将按角色定位奖励代币。");
+            ChatHandler(player->GetSession()).SendSysMessage("|cff4CFF00[系统]|r 根据天赋发放击杀副本Boss奖励模块已启用。");
         }
     }
 
@@ -54,103 +51,101 @@ public:
         }
         else
         {
-            MailDraft draft("副本奖励", "尊敬的玩家，
-
-您在副本中的表现获得了奖励，但由于背包已满，系统已将奖励通过邮件发送给您，请注意查收。祝您游戏愉快！");
+            MailDraft draft("副本奖励", "尊敬的玩家：\n\n由于您的背包已满，系统已通过邮件将奖励发放给您，请注意查收。\n\n感谢您的参与，祝游戏愉快！");
             Item* item = Item::CreateItem(itemId, count, player);
             if (item)
             {
                 draft.AddItem(item);
-                draft.SendMailTo(player, MailSender(MAIL_CREATURE, 0), MAIL_CHECK_MASK_COPIED);
+                CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+                draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_CREATURE, 0), MAIL_CHECK_MASK_COPIED);
+                CharacterDatabase.CommitTransaction(trans);
             }
         }
     }
 
-    void OnPlayerCreatureKill(Player* player, Creature* boss) override
+    void OnPlayerCreatureKill(Player* killer, Creature* boss) override
     {
-        if (ModuleEnable && boss->GetLevel() > MinimalLevel && boss->IsDungeonBoss())
+        if (!sModuleEnabled || !boss->IsDungeonBoss() || boss->GetLevel() <= sMinBossLevel)
+            return;
+
+        Map* map = killer->GetMap();
+        bool isRaid = map->IsRaid();
+        uint32 tokenItemId = isRaid ? sRaidTokenId : sDungeonTokenId;
+
+        std::ostringstream rewardLog;
+        rewardLog << "[击杀Boss: " << boss->GetNameForLocaleIdx(LOCALE_zhCN) << "]\n";
+
+        uint32 rewardCount = 0;
+        for (const auto& playerRef : map->GetPlayers())
         {
-            Map* map = player->GetMap();
-            std::string tag_colour = "7bbef7";
-            std::string plr_colour = "7bbef7";
-            bool isRaid = map->IsRaid();
+            Player* member = playerRef.GetSource();
+            if (!member)
+                continue;
 
-            Map::PlayerList const & playerlist = map->GetPlayers();
-            std::ostringstream stream;
-            uint32 rewardedCount = 0;
+            std::string name = member->GetName();
 
-            stream << "[击杀Boss: " << boss->GetNameForLocaleIdx(LOCALE_zhCN) << "]" << std::endl;
-
-            for (auto const& playerRef : playerlist)
+            if (member->HasHealSpec() && (sRewardSpecFlags & FLAG_SPEC_HEALER))
             {
-                Player* member = playerRef.GetSource();
-                if (!member)
-                    continue;
-
-                std::string name = member->GetName();
-                uint32 itemId = isRaid ? RaidToken : DungeonToken;
-
-                if (member->HasHealSpec() && (RewardSpec & FLAG_SPEC_HEALER))
-                {
-                    ++rewardedCount;
-                    GiveReward(member, itemId, TokenCount);
-                    stream << rewardedCount << ". |CFF" << tag_colour << "|r|cff" << plr_colour << name << "|r " << HMessageText << std::endl;
-                }
-                else if (member->HasTankSpec() && (RewardSpec & FLAG_SPEC_TANK))
-                {
-                    ++rewardedCount;
-                    GiveReward(member, itemId, TokenCount);
-                    stream << rewardedCount << ". |CFF" << tag_colour << "|r|cff" << plr_colour << name << "|r " << TMessageText << std::endl;
-                }
-                else if (member->HasCasterSpec() && (RewardSpec & FLAG_SPEC_DPS))
-                {
-                    ++rewardedCount;
-                    GiveReward(member, itemId, TokenCount);
-                    stream << rewardedCount << ". |CFF" << tag_colour << "|r|cff" << plr_colour << name << "|r " << DMessageText << std::endl;
-                }
+                GiveReward(member, tokenItemId, sTokenCount);
+                rewardLog << " - |cff00ff00" << name << "|r " << sHealerRewardText << "\n";
+                ++rewardCount;
             }
+            else if (member->HasTankSpec() && (sRewardSpecFlags & FLAG_SPEC_TANK))
+            {
+                GiveReward(member, tokenItemId, sTokenCount);
+                rewardLog << " - |cff00aaff" << name << "|r " << sTankRewardText << "\n";
+                ++rewardCount;
+            }
+            else if (member->HasCasterSpec() && (sRewardSpecFlags & FLAG_SPEC_DPS))
+            {
+                GiveReward(member, tokenItemId, sTokenCount);
+                rewardLog << " - |cffffcc00" << name << "|r " << sDpsRewardText << "\n";
+                ++rewardCount;
+            }
+        }
 
-            for (auto const& playerRef : playerlist)
+        if (rewardCount > 0)
+        {
+            for (const auto& playerRef : map->GetPlayers())
             {
                 Player* member = playerRef.GetSource();
                 if (member)
-                    sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str(), member);
+                {
+                    sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, rewardLog.str().c_str(), member);
+                }
             }
         }
     }
 };
 
-// Initial Conf
-class Spec_Reward_Conf : public WorldScript
+class SpecRewardConfig : public WorldScript
 {
 public:
-    Spec_Reward_Conf() : WorldScript("Spec_Reward_Conf") { }
+    SpecRewardConfig() : WorldScript("SpecRewardConfig") { }
 
     void OnBeforeConfigLoad(bool reload) override
     {
-        if (!reload) {
-            SetInitialWorldSettings();
-        }
+        if (!reload)
+            LoadConfig();
     }
 
-    void SetInitialWorldSettings()
+    void LoadConfig()
     {
-        ModuleEnable    = sConfigMgr->GetOption<bool>("Spec_Reward.Enable", true);
-        AnnouncerEnable = sConfigMgr->GetOption<bool>("Spec_Reward.Announce", true);
-        RewardSpec      = sConfigMgr->GetOption<uint32>("Spec_Reward.Spec", 1);
-        MinimalLevel    = sConfigMgr->GetOption<uint32>("Spec_Reward.Level", 80);
-        DungeonToken    = sConfigMgr->GetOption<uint32>("Spec_Reward.DungeonToken", 38186);
-        RaidToken       = sConfigMgr->GetOption<uint32>("Spec_Reward.RaidToken", 38186);
-        TokenCount      = sConfigMgr->GetOption<uint32>("Spec_Reward.TokenCount", 1);
-        HMessageText    = sConfigMgr->GetOption<std::string>("Spec_Reward.HealText", "获得了治疗奖励");
-        TMessageText    = sConfigMgr->GetOption<std::string>("Spec_Reward.TankText", "获得了坦克奖励");
-        DMessageText    = sConfigMgr->GetOption<std::string>("Spec_Reward.DPSText", "获得了输出奖励");
+        sModuleEnabled      = sConfigMgr->GetOption<bool>("SpecReward.Enable", true);
+        sAnnounceEnabled    = sConfigMgr->GetOption<bool>("SpecReward.Announce", true);
+        sRewardSpecFlags    = sConfigMgr->GetOption<uint32>("SpecReward.SpecFlags", 7);
+        sMinBossLevel       = sConfigMgr->GetOption<uint32>("SpecReward.MinBossLevel", 80);
+        sDungeonTokenId     = sConfigMgr->GetOption<uint32>("SpecReward.DungeonToken", 38186);
+        sRaidTokenId        = sConfigMgr->GetOption<uint32>("SpecReward.RaidToken", 38186);
+        sTokenCount         = sConfigMgr->GetOption<uint32>("SpecReward.TokenCount", 1);
+        sHealerRewardText   = sConfigMgr->GetOption<std::string>("SpecReward.HealerText", "获得了治疗奖励");
+        sTankRewardText     = sConfigMgr->GetOption<std::string>("SpecReward.TankText", "获得了坦克奖励");
+        sDpsRewardText      = sConfigMgr->GetOption<std::string>("SpecReward.DPSText", "获得了输出奖励");
     }
 };
 
-// Add all scripts in one
 void Addmod_spec_rewardScripts()
 {
-    new Spec_Reward_Conf();
-    new Spec_Reward();
+    new SpecRewardConfig();
+    new SpecReward();
 }
