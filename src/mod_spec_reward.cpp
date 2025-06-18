@@ -44,19 +44,31 @@ public:
 		ItemPosCountVec dest;
 		if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, count) == EQUIP_ERR_OK)
 		{
-			player->StoreNewItem(dest, itemId, count, true);
+			player->AddItem(itemId, count);
+			//player->StoreNewItem(dest, itemId, count, true);
 		}
 		else
 		{
 			MailDraft draft("副本奖励", "尊敬的玩家：\n\n由于您的背包已满，系统已通过邮件将奖励发放给您，请注意查收。\n\n感谢您的参与，祝游戏愉快！");
-			Item* item = Item::CreateItem(itemId, count, player);
-			if (item)
+
+			const ItemTemplate* itemTemplate = sObjectMgr->GetItemTemplate(itemId);
+			if (!itemTemplate)
+				return;
+
+			uint32 maxStack = itemTemplate->GetMaxStackSize(); // 获取最大堆叠数
+			while (count > 0)
 			{
-				draft.AddItem(item);
-				CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-				draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_CREATURE, 0), MAIL_CHECK_MASK_COPIED);
-				CharacterDatabase.CommitTransaction(trans);
+				uint32 sendCount = std::min(count, maxStack);
+				Item* item = Item::CreateItem(itemId, sendCount, player);
+				if (item)
+					draft.AddItem(item);
+
+				count -= sendCount;
 			}
+
+			CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+			draft.SendMailTo(trans, MailReceiver(player), MailSender(MAIL_CREATURE, MAIL_STATIONERY_GM), MAIL_CHECK_MASK_COPIED);
+			CharacterDatabase.CommitTransaction(trans);
 		}
 	}
 
