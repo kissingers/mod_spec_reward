@@ -20,9 +20,10 @@ std::string HMessageText, TMessageText, DMessageText;
 
 enum SpecType
 {
-	FLAG_SPEC_HEALER = 0x00000001,
-	FLAG_SPEC_DPS = 0x00000002,
-	FLAG_SPEC_TANK = 0x00000004
+	FLAG_SPEC_TANK   = 0x00000001,
+	FLAG_SPEC_HEALER = 0x00000002,
+	FLAG_SPEC_DPS    = 0x00000004
+
 };
 
 // Add player scripts
@@ -35,7 +36,7 @@ public:
 	{
 		if (ModuleEnable && AnnouncerEnable)
 		{
-			ChatHandler(player->GetSession()).SendSysMessage("This server is running the |cff4CFF00Spec Reward |rmodule.");
+			ChatHandler(player->GetSession()).SendSysMessage("服务器已启用 |cff4CFF00职业副本奖励 |r模块.");
 		}
 	}
 
@@ -142,13 +143,13 @@ public:
 	{
 		ModuleEnable = sConfigMgr->GetOption<bool>("Spec_Reward.Enable", true);
 		AnnouncerEnable = sConfigMgr->GetOption<bool>("Spec_Reward.Announce", true);
-		RewardSpec = sConfigMgr->GetOption<uint32>("Spec_Reward.Spec", 1);
+		RewardSpec = sConfigMgr->GetOption<uint32>("Spec_Reward.Spec", 3);
 		MinimalLevel = sConfigMgr->GetOption<uint32>("Spec_Reward.Level", 80);
 		DungeonToken = sConfigMgr->GetOption<uint32>("Spec_Reward.DungeonToken", 38186);
 		RaidToken = sConfigMgr->GetOption<uint32>("Spec_Reward.RaidToken", 38186);
 		TokenCount = sConfigMgr->GetOption<uint32>("Spec_Reward.TokenCount", 1);
-		HMessageText = sConfigMgr->GetOption<std::string>("Spec_Reward.HealText", "-- 获得治疗额外奖励!");
 		TMessageText = sConfigMgr->GetOption<std::string>("Spec_Reward.TankText", "--获得坦克额外奖励!");
+		HMessageText = sConfigMgr->GetOption<std::string>("Spec_Reward.HealText", "-- 获得治疗额外奖励!");
 		DMessageText = sConfigMgr->GetOption<std::string>("Spec_Reward.DPSText", "--获得输出额外奖励!");
 	}
 };
