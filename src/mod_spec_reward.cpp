@@ -99,23 +99,29 @@ public:
 				p_name = member->GetName();
 				if (member->HasHealSpec() && RewardSpec & FLAG_SPEC_HEALER)
 				{
-					++count;
 					GiveReward(member, tokenItemId, TokenCount);
+					if (member->IsGameMaster() || !member->isGMVisible())
+						continue;
+					++count;
 					stream << count << ". |CFF" << tag_colour << "|r|cff" << plr_colour << p_name << "|r " << HMessageText << std::endl;
 					continue;
 				}
 
 				if (member->HasTankSpec() && RewardSpec & FLAG_SPEC_TANK)
 				{
-					++count;
 					GiveReward(member, tokenItemId, TokenCount);
+					if (member->IsGameMaster() || !member->isGMVisible())
+						continue;
+					++count;
 					stream << count << ". |CFF" << tag_colour << "|r|cff" << plr_colour << p_name << "|r " << TMessageText << std::endl;
 					continue;
 				}
 				if (member->HasCasterSpec() && RewardSpec & FLAG_SPEC_DPS)
 				{
-					++count;
 					GiveReward(member, tokenItemId, TokenCount);
+					if (member->IsGameMaster() || !member->isGMVisible())
+						continue;
+					++count;
 					stream << count << ". |CFF" << tag_colour << "|r|cff" << plr_colour << p_name << "|r " << DMessageText << std::endl;
 					continue;
 				}

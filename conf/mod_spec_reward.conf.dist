@@ -9,32 +9,34 @@
 # Spec_Reward configuration
 ########################################
 #
-#    Spec_Reward.Enable
-#        Description: Enable my module and print message at server start
-#        Default:     0 - Disabled
-#                     1 - Enabled
+#    Spec_Reward.Enable   
+#    Description:启用模块
+#    Spec_Reward.Announce  
+#    Description:允许在玩家登陆时候通告
+#        Default:     1 - Enabled
+#                     0 - Disabled
 #
 Spec_Reward.Enable = 1
 Spec_Reward.Announce = 1
 
-# Description: Which spec player should be reward.
+# Description: 哪些类型的职业可以获取奖励.
 # 1:Tank 2:Healer 4:DPS
 # Default: 3 (1+2) Healer+Tank
 Spec_Reward.Spec =	3
 
-# Description: Minimal Level of Boss killed should trigger  
+# Description: 获取奖励的Boss最低等级  
 Spec_Reward.Level = 80
 
-#Reward Item if DungeonBoss  killed
+#普通本奖励
 Spec_Reward.DungeonToken = 38186
 
-#Reward Item if RaidBoss  killed
+#团队本奖励
 Spec_Reward.RaidToken = 38186
 
-#Reward Item Count while boss killed
+#获得奖励的数量
 Spec_Reward.TokenCount = 1
 
-# WorldMessage Display In System
+# 对应职业通告的文本
 Spec_Reward.TankText = "--获得坦克额外奖励!"
 Spec_Reward.HealText = "--获得治疗额外奖励!"
 Spec_Reward.DPSText = "--获得输出额外奖励!"
