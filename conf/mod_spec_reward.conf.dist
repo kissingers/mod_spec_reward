@@ -1,7 +1,6 @@
-/*
- * T 奶 DPS 奖励模块,基于BetaYi的脚本改编和优化  --By 牛皮德来
- */
-
+#
+# T 奶 DPS 奖励模块,基于BetaYi的脚本改编和优化  --By 牛皮德来
+#
 
 [worldserver]
 
